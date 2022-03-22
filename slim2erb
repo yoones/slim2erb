@@ -1,0 +1,64 @@
+#!/bin/bash
+
+if [ $# -gt 0 ]; then
+    if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	echo "Usage: slim2erb [options]"
+	echo ""
+	echo "    -h, --help          : Displays this message"
+	echo "    --remove-slim-files : Deletes .html.slim files after transpiling them to ERB."
+	echo ""
+	echo "This script recursively replaces all .html.slim files under your current directory by .html.erb files"
+	echo "Source: https://github.com/yoones/slim2erb"
+	exit 0
+    elif [ "$1" != "--remove-slim-files" ]; then
+	echo "Error: unknown option" > /dev/stderr
+	exit 1
+    fi
+fi
+
+gem list -e slim | grep slim > /dev/null
+SLIMRB_EXISTS=$?
+
+gem list -e htmlbeautifier | grep htmlbeautifier > /dev/null
+HTMLBEAUTIFIER_EXISTS=$?
+
+if [ $SLIMRB_EXISTS != "0" ]; then
+    echo "Error: slimrb not found (https://github.com/slim-template/slim/blob/master/bin/slimrb => gem install slim)" > /dev/stderr
+fi
+if [ $HTMLBEAUTIFIER_EXISTS != "0" ]; then
+    echo "Error: htmlbeautifier not found (https://github.com/threedaymonk/htmlbeautifier => gem install htmlbeautifier)" > /dev/stderr
+fi
+
+if [ $SLIMRB_EXISTS != "0" ] || [ $HTMLBEAUTIFIER_EXISTS != "0" ]; then
+    exit 1
+fi
+
+set -e
+
+echo "Transpiling SLIM to ERB..."
+for slim_filepath in $(find . -name \*.html.slim); do
+    erb_filepath=$(echo "$slim_filepath" | sed 's/\.slim$/.erb/')
+    slimrb -o disable_escape=true -e $slim_filepath $erb_filepath
+    echo "  $erb_filepath"
+done
+
+echo -e "\nBeautifying ERB..."
+for erb_filepath in $(find . -name \*.html.erb); do
+    htmlbeautifier $erb_filepath
+    echo "  $erb_filepath"
+done
+
+if [ "$1" == "--remove-slim-files" ]; then
+    echo ""
+    read -p "You requested files deletion. Are you sure (y/N)? " -r
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+	echo -e "\nDeleting SLIM files..."
+	for slim_filepath in $(find . -name \*.html.slim); do
+	    rm $slim_filepath
+	    echo "  $slim_filepath"
+	done
+    fi
+fi
+
+echo -e "\ndone."
